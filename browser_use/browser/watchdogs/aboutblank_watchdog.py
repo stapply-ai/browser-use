@@ -157,17 +157,19 @@ class AboutBlankWatchdog(BaseWatchdog):
 					}}
 					document.title = animated_title;
 
-					// Create the main overlay
-					const loadingOverlay = document.createElement('div');
-					loadingOverlay.id = 'pretty-loading-animation';
-					loadingOverlay.style.position = 'fixed';
-					loadingOverlay.style.top = '0';
-					loadingOverlay.style.left = '0';
-					loadingOverlay.style.width = '100vw';
-					loadingOverlay.style.height = '100vh';
-					loadingOverlay.style.background = '#000';
-					loadingOverlay.style.zIndex = '99999';
-					loadingOverlay.style.overflow = 'hidden';
+						// Create the main overlay
+						const loadingOverlay = document.createElement('div');
+						loadingOverlay.id = 'pretty-loading-animation';
+						loadingOverlay.style.position = 'fixed';
+						loadingOverlay.style.top = '0';
+						loadingOverlay.style.left = '0';
+						loadingOverlay.style.width = '100vw';
+						loadingOverlay.style.height = '100vh';
+						loadingOverlay.style.background = 'radial-gradient(1200px 800px at 20% 20%, #0f172a 0%, #0b1023 40%, #050814 70%, #000 100%)';
+						loadingOverlay.style.zIndex = '99999';
+						loadingOverlay.style.overflow = 'hidden';
+						loadingOverlay.style.opacity = '0';
+						loadingOverlay.style.transition = 'opacity 300ms ease-out';
 
 					// Create the image element
 					const img = document.createElement('img');
@@ -179,38 +181,45 @@ class AboutBlankWatchdog(BaseWatchdog):
 					img.style.left = '0px';
 					img.style.top = '0px';
 					img.style.zIndex = '2';
-					img.style.opacity = '0.8';
+						img.style.opacity = '0.9';
+						img.style.filter = 'drop-shadow(0 6px 24px rgba(255,255,255,0.12)) drop-shadow(0 2px 8px rgba(80,160,255,0.25))';
 
-					// Create the text element (center bottom of the screen, always visible, above the image)
+						// Create the text element (center bottom of the screen, always visible, above the image)
 					const text = document.createElement('div');
-					text.textContent = 'powered by Browser-Use';
+						text.textContent = 'powered by Browser-Use';
 					text.style.color = '#fff';
-					text.style.fontSize = '16px';	
+						text.style.fontSize = '14px';
+						text.style.letterSpacing = '0.04em';
+						text.style.fontFamily = 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji';
 					text.style.textAlign = 'center';
 					text.style.position = 'absolute';
-					text.style.bottom = '10px';
+						text.style.bottom = '20px';
 					text.style.left = '50%';
 					text.style.transform = 'translateX(-50%)';
 					text.style.zIndex = '3';
-					text.style.opacity = '0.8';
+						text.style.opacity = '0.85';
 
-					// Create the Browser-Use logo element (center bottom of the screen, always visible, above the image)
+						// Create the Browser-Use logo element (bottom center, above the image)
 					const browserUseLogo = document.createElement('img');
 					browserUseLogo.src = 'https://cf.browser-use.com/logo.svg';
 					browserUseLogo.alt = 'Browser-Use';
-					browserUseLogo.style.width = '100px';
+						browserUseLogo.style.width = '90px';
 					browserUseLogo.style.height = 'auto';
 					browserUseLogo.style.position = 'absolute';
-					browserUseLogo.style.left = '0px';
-					browserUseLogo.style.top = '0px';
+						browserUseLogo.style.left = '50%';
+						browserUseLogo.style.bottom = '48px';
+						browserUseLogo.style.transform = 'translateX(-50%)';
 					browserUseLogo.style.zIndex = '3';
-					browserUseLogo.style.opacity = '0.8';
+						browserUseLogo.style.opacity = '0.9';
+						browserUseLogo.style.filter = 'drop-shadow(0 4px 16px rgba(80,160,255,0.35))';
 
 					loadingOverlay.appendChild(img);
 					loadingOverlay.appendChild(text);
 					loadingOverlay.appendChild(browserUseLogo);
 
-					document.body.appendChild(loadingOverlay);
+						document.body.appendChild(loadingOverlay);
+						// Fade-in
+						requestAnimationFrame(() => {{ loadingOverlay.style.opacity = '1'; }});
 
 
 
@@ -257,16 +266,30 @@ class AboutBlankWatchdog(BaseWatchdog):
 						y = Math.min(y, window.innerHeight - img.offsetHeight);
 					}});
 
-					// Add a little CSS for smoothness
+						// Add a little CSS for smoothness and subtle décor
 					const style = document.createElement('style');
 					style.textContent = `
 						#pretty-loading-animation {{
-							/*backdrop-filter: blur(2px) brightness(0.9);*/
+								/*backdrop-filter: blur(2px) brightness(0.9);*/
+								position: fixed;
+								inset: 0;
+							}}
+							#pretty-loading-animation::before {{
+								content: '';
+								position: absolute;
+								inset: 0;
+								background: radial-gradient(600px 400px at 80% 80%, rgba(80,160,255,0.12) 0%, rgba(80,160,255,0.04) 40%, transparent 70%)
+									, radial-gradient(800px 600px at 10% 10%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 35%, transparent 70%);
+								pointer-events: none;
+								z-index: 1;
 						}}
 						#pretty-loading-animation img {{
 							user-select: none;
 							pointer-events: none;
 						}}
+							@media (max-width: 640px) {{
+								#pretty-loading-animation img {{ width: 140px !important; }}
+							}}
 					`;
 					document.head.appendChild(style);
 				}})('{browser_session_label}');
