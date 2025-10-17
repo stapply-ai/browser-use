@@ -103,12 +103,20 @@ class DefaultActionWatchdog(BaseWatchdog):
 			else:
 				try:
 					# Try to type to the specific element
-					input_metadata = await self._input_text_element_node_impl(
-						element_node,
-						event.text,
-						clear=event.clear or (not event.text),
-						is_sensitive=event.is_sensitive,
-					)
+					if event.fast_typing_mode:
+						input_metadata = await self._fast_input_text_element_node_impl(
+							element_node,
+							event.text,
+							clear=event.clear or (not event.text),
+							is_sensitive=event.is_sensitive,
+						)
+					else:
+						input_metadata = await self._input_text_element_node_impl(
+							element_node,
+							event.text,
+							clear=event.clear or (not event.text),
+							is_sensitive=event.is_sensitive,
+						)
 					# Log with sensitive data protection
 					if event.is_sensitive:
 						if event.sensitive_key_name:
@@ -1174,6 +1182,150 @@ class DefaultActionWatchdog(BaseWatchdog):
 		except Exception as e:
 			self.logger.error(f'Failed to input text via CDP: {type(e).__name__}: {e}')
 			raise BrowserError(f'Failed to input text into element: {repr(element_node)}')
+
+	async def _fast_input_text_element_node_impl(
+		self, element_node: EnhancedDOMTreeNode, text: str, clear: bool = True, is_sensitive: bool = False
+	) -> dict | None:
+		"""
+		Fast text input using direct JavaScript execution instead of character-by-character CDP events.
+		This is much faster for cloud browsers where CDP roundtrips are slow.
+		"""
+
+		try:
+			# Get CDP client
+			cdp_client = self.browser_session.cdp_client
+
+			# Get the correct session for the element's iframe
+			cdp_session = await self.browser_session.cdp_client_for_node(element_node)
+
+			# Get element info
+			backend_node_id = element_node.backend_node_id
+
+			# Track coordinates for metadata
+			input_coordinates = None
+
+			# Scroll element into view
+			try:
+				await cdp_session.cdp_client.send.DOM.scrollIntoViewIfNeeded(
+					params={'backendNodeId': backend_node_id}, session_id=cdp_session.session_id
+				)
+				await asyncio.sleep(0.01)
+			except Exception as e:
+				self.logger.warning(
+					f'⚠️ Failed to scroll element {element_node} into view before fast typing: {type(e).__name__}: {e}'
+				)
+
+			# Get object ID for the element
+			result = await cdp_client.send.DOM.resolveNode(
+				params={'backendNodeId': backend_node_id},
+				session_id=cdp_session.session_id,
+			)
+			assert 'object' in result and 'objectId' in result['object'], (
+				'Failed to find DOM element based on backendNodeId, maybe page content changed?'
+			)
+			object_id = result['object']['objectId']
+
+			# Get current coordinates using unified method
+			coords = await self.browser_session.get_element_coordinates(backend_node_id, cdp_session)
+			if coords:
+				center_x = coords.x + coords.width / 2
+				center_y = coords.y + coords.height / 2
+
+				# Check for occlusion before using coordinates for focus
+				is_occluded = await self._check_element_occlusion(backend_node_id, center_x, center_y, cdp_session)
+
+				if is_occluded:
+					self.logger.debug('🚫 Input element is occluded, skipping coordinate-based focus')
+					input_coordinates = None  # Force fallback to CDP-only focus
+				else:
+					input_coordinates = {'input_x': center_x, 'input_y': center_y}
+					self.logger.debug(f'Using unified coordinates: x={center_x:.1f}, y={center_y:.1f}')
+			else:
+				input_coordinates = None
+				self.logger.debug('No coordinates found for element')
+
+			# Ensure we have a valid object_id before proceeding
+			if not object_id:
+				raise ValueError('Could not get object_id for element')
+
+			# Step 1: Focus the element using simple strategy
+			focused_successfully = await self._focus_element_simple(
+				backend_node_id=backend_node_id, object_id=object_id, cdp_session=cdp_session, input_coordinates=input_coordinates
+			)
+
+			# Step 2: Use JavaScript to set the value directly (much faster than CDP events)
+			# Escape the text for JavaScript to handle special characters
+			escaped_text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+
+			# JavaScript code to set the value and trigger events
+			fast_input_script = f"""
+			(function() {{
+				const element = this;
+				
+				// Focus the element
+				element.focus();
+				
+				// Clear existing text if requested
+				{'element.value = "";' if clear else ''}
+				
+				// Set the new value
+				element.value = "{escaped_text}";
+				
+				// Trigger comprehensive event sequence for framework compatibility
+				const events = ['input', 'change', 'keydown', 'keyup', 'keypress', 'focus', 'blur'];
+				events.forEach(eventType => {{
+					const event = new Event(eventType, {{ bubbles: true, cancelable: true }});
+					element.dispatchEvent(event);
+				}});
+				
+				// For React and other frameworks, also trigger the input event with InputEvent
+				if (typeof InputEvent !== 'undefined') {{
+					const inputEvent = new InputEvent('input', {{
+						bubbles: true,
+						cancelable: true,
+						inputType: 'insertText',
+						data: "{escaped_text}"
+					}});
+					element.dispatchEvent(inputEvent);
+				}}
+				
+				// Trigger change event specifically for form validation
+				const changeEvent = new Event('change', {{ bubbles: true, cancelable: true }});
+				element.dispatchEvent(changeEvent);
+				
+				return {{ success: true, valueLength: element.value.length }};
+			}})()
+			"""
+
+			if is_sensitive:
+				self.logger.debug('🎯 Fast typing <sensitive> text via JavaScript')
+			else:
+				self.logger.debug(f'🎯 Fast typing text via JavaScript: "{text}"')
+
+			# Execute the JavaScript
+			js_result = await cdp_session.cdp_client.send.Runtime.callFunctionOn(
+				params={
+					'objectId': object_id,
+					'functionDeclaration': fast_input_script,
+					'returnByValue': True,
+				},
+				session_id=cdp_session.session_id,
+			)
+
+			if js_result.get('exceptionDetails'):
+				raise Exception(f'JavaScript execution failed: {js_result["exceptionDetails"]}')
+
+			# Verify the text was set correctly
+			result_value = js_result.get('result', {}).get('value', {})
+			if not result_value.get('success'):
+				raise Exception('JavaScript fast input failed to set value')
+
+			# Return coordinates metadata if available
+			return input_coordinates
+
+		except Exception as e:
+			self.logger.error(f'Failed to fast input text via JavaScript: {type(e).__name__}: {e}')
+			raise BrowserError(f'Failed to fast input text into element: {repr(element_node)}')
 
 	async def _trigger_framework_events(self, object_id: str, cdp_session) -> None:
 		"""

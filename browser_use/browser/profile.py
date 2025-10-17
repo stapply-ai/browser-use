@@ -622,6 +622,12 @@ class BrowserProfile(BrowserConnectArgs, BrowserLaunchPersistentContextArgs, Bro
 
 	wait_between_actions: float = Field(default=0.1, description='Time to wait between actions.')
 
+	# --- Text input optimization ---
+	fast_typing_mode: bool = Field(
+		default=True,
+		description='Use direct JavaScript input instead of character-by-character CDP events for faster text input. Recommended for cloud browsers to avoid slow CDP roundtrips. When False, text is typed character by character.',
+	)
+
 	# --- UI/viewport/DOM ---
 	highlight_elements: bool = Field(default=True, description='Highlight interactive elements on the page.')
 	dom_highlight_elements: bool = Field(
