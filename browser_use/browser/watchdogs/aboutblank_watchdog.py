@@ -151,7 +151,7 @@ class AboutBlankWatchdog(BaseWatchdog):
 						return;
 					}}
 					
-					const animated_title = `Starting agent ${{browser_session_label}}...`;
+					const animated_title = `Starting Agent Stapply...`;
 					if (document.title === animated_title) {{
 						return;      // already run on this tab, dont run again
 					}}
@@ -171,8 +171,8 @@ class AboutBlankWatchdog(BaseWatchdog):
 
 					// Create the image element
 					const img = document.createElement('img');
-					img.src = 'https://cf.browser-use.com/logo.svg';
-					img.alt = 'Browser-Use';
+					img.src = 'https://storage.stapply.ai/assets/stapply_white.svg';
+					img.alt = 'Agent Stapply';
 					img.style.width = '200px';
 					img.style.height = 'auto';
 					img.style.position = 'absolute';
@@ -181,8 +181,38 @@ class AboutBlankWatchdog(BaseWatchdog):
 					img.style.zIndex = '2';
 					img.style.opacity = '0.8';
 
+					// Create the text element (center bottom of the screen, always visible, above the image)
+					const text = document.createElement('div');
+					text.textContent = 'powered by Browser-Use';
+					text.style.color = '#fff';
+					text.style.fontSize = '16px';	
+					text.style.textAlign = 'center';
+					text.style.position = 'absolute';
+					text.style.bottom = '10px';
+					text.style.left = '50%';
+					text.style.transform = 'translateX(-50%)';
+					text.style.zIndex = '3';
+					text.style.opacity = '0.8';
+
+					// Create the Browser-Use logo element (center bottom of the screen, always visible, above the image)
+					const browserUseLogo = document.createElement('img');
+					browserUseLogo.src = 'https://cf.browser-use.com/logo.svg';
+					browserUseLogo.alt = 'Browser-Use';
+					browserUseLogo.style.width = '100px';
+					browserUseLogo.style.height = 'auto';
+					browserUseLogo.style.position = 'absolute';
+					browserUseLogo.style.left = '0px';
+					browserUseLogo.style.top = '0px';
+					browserUseLogo.style.zIndex = '3';
+					browserUseLogo.style.opacity = '0.8';
+
 					loadingOverlay.appendChild(img);
+					loadingOverlay.appendChild(text);
+					loadingOverlay.appendChild(browserUseLogo);
+
 					document.body.appendChild(loadingOverlay);
+
+
 
 					// DVD screensaver bounce logic
 					let x = Math.random() * (window.innerWidth - 300);
