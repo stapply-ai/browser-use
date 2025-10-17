@@ -184,9 +184,10 @@ class AboutBlankWatchdog(BaseWatchdog):
 						img.style.opacity = '0.9';
 						img.style.filter = 'drop-shadow(0 6px 24px rgba(255,255,255,0.12)) drop-shadow(0 2px 8px rgba(80,160,255,0.25))';
 
-						// Create the text element (center bottom of the screen, always visible, above the image)
+					// Create the text element (center bottom of the screen, always visible, above the image)
 					const text = document.createElement('div');
-						text.textContent = 'powered by Browser-Use';
+					text.id = 'powered-by';
+					text.textContent = 'powered by Browser-Use';
 					text.style.color = '#fff';
 						text.style.fontSize = '14px';
 						text.style.letterSpacing = '0.04em';
@@ -201,6 +202,7 @@ class AboutBlankWatchdog(BaseWatchdog):
 
 						// Create the Browser-Use logo element (bottom center, above the image)
 					const browserUseLogo = document.createElement('img');
+					browserUseLogo.id = 'browseruse-logo';
 					browserUseLogo.src = 'https://cf.browser-use.com/logo.svg';
 					browserUseLogo.alt = 'Browser-Use';
 						browserUseLogo.style.width = '90px';
@@ -223,7 +225,7 @@ class AboutBlankWatchdog(BaseWatchdog):
 
 
 
-					// DVD screensaver bounce logic
+					// DVD screensaver bounce logic with bottom safe area to avoid branding overlap
 					let x = Math.random() * (window.innerWidth - 300);
 					let y = Math.random() * (window.innerHeight - 300);
 					let dx = 1.2 + Math.random() * 0.4; // px per frame
@@ -232,24 +234,39 @@ class AboutBlankWatchdog(BaseWatchdog):
 					if (Math.random() > 0.5) dx = -dx;
 					if (Math.random() > 0.5) dy = -dy;
 
+					function getBounds(w, h) {{
+						const margin = 8; // small breathing room
+						const textEl = document.getElementById('powered-by');
+						const logoEl = document.getElementById('browseruse-logo');
+						const textRect = textEl ? textEl.getBoundingClientRect() : null;
+						const logoRect = logoEl ? logoEl.getBoundingClientRect() : null;
+						let bottomSafeTop = window.innerHeight;
+						if (textRect) bottomSafeTop = Math.min(bottomSafeTop, textRect.top);
+						if (logoRect) bottomSafeTop = Math.min(bottomSafeTop, logoRect.top);
+						const maxX = Math.max(0, window.innerWidth - w);
+						const maxY = Math.max(0, bottomSafeTop - h - margin);
+						return {{ maxX, maxY }};
+					}}
+
 					function animate() {{
 						const imgWidth = img.offsetWidth || 300;
 						const imgHeight = img.offsetHeight || 300;
+						const {{ maxX, maxY }} = getBounds(imgWidth, imgHeight);
 						x += dx;
 						y += dy;
 
 						if (x <= 0) {{
 							x = 0;
 							dx = Math.abs(dx);
-						}} else if (x + imgWidth >= window.innerWidth) {{
-							x = window.innerWidth - imgWidth;
+						}} else if (x >= maxX) {{
+							x = maxX;
 							dx = -Math.abs(dx);
 						}}
 						if (y <= 0) {{
 							y = 0;
 							dy = Math.abs(dy);
-						}} else if (y + imgHeight >= window.innerHeight) {{
-							y = window.innerHeight - imgHeight;
+						}} else if (y >= maxY) {{
+							y = maxY;
 							dy = -Math.abs(dy);
 						}}
 
@@ -258,12 +275,23 @@ class AboutBlankWatchdog(BaseWatchdog):
 
 						requestAnimationFrame(animate);
 					}}
+					// Ensure initial position respects bounds
+					(function initPosition() {{
+						const w = img.offsetWidth || 300;
+						const h = img.offsetHeight || 300;
+						const {{ maxX, maxY }} = getBounds(w, h);
+						x = Math.min(Math.max(0, x), maxX);
+						y = Math.min(Math.max(0, y), maxY);
+					}})();
 					animate();
 
 					// Responsive: update bounds on resize
 					window.addEventListener('resize', () => {{
-						x = Math.min(x, window.innerWidth - img.offsetWidth);
-						y = Math.min(y, window.innerHeight - img.offsetHeight);
+						const w = img.offsetWidth || 300;
+						const h = img.offsetHeight || 300;
+						const {{ maxX, maxY }} = getBounds(w, h);
+						x = Math.min(x, maxX);
+						y = Math.min(y, maxY);
 					}});
 
 						// Add a little CSS for smoothness and subtle décor
