@@ -1192,9 +1192,6 @@ class DefaultActionWatchdog(BaseWatchdog):
 		This is the fastest possible approach for cloud browsers where CDP roundtrips are slow.
 		"""
 
-		self.logger.debug(f'🚀 Fast typing text via JavaScript: "{text}"')
-		self.logger.info(f'🚀 Fast typing text via JavaScript: "{text}"')
-
 		try:
 			# Get CDP client
 			cdp_client = self.browser_session.cdp_client
