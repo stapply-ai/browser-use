@@ -1187,8 +1187,9 @@ class DefaultActionWatchdog(BaseWatchdog):
 		self, element_node: EnhancedDOMTreeNode, text: str, clear: bool = True, is_sensitive: bool = False
 	) -> dict | None:
 		"""
-		Fast text input using direct JavaScript execution instead of character-by-character CDP events.
-		This is much faster for cloud browsers where CDP roundtrips are slow.
+		Ultra-fast text input using direct JavaScript value assignment (paste approach).
+		This directly sets the input value without any events or character-by-character CDP calls.
+		This is the fastest possible approach for cloud browsers where CDP roundtrips are slow.
 		"""
 
 		try:
@@ -1253,54 +1254,29 @@ class DefaultActionWatchdog(BaseWatchdog):
 				backend_node_id=backend_node_id, object_id=object_id, cdp_session=cdp_session, input_coordinates=input_coordinates
 			)
 
-			# Step 2: Use JavaScript to set the value directly (much faster than CDP events)
+			# Step 2: Use JavaScript to directly set the value (ultra-fast paste approach)
 			# Escape the text for JavaScript to handle special characters
 			escaped_text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
 
-			# JavaScript code to set the value and trigger events
+			# Ultra-fast JavaScript code that just sets the value directly (no events)
 			fast_input_script = f"""
 			(function() {{
 				const element = this;
 				
-				// Focus the element
-				element.focus();
-				
 				// Clear existing text if requested
 				{'element.value = "";' if clear else ''}
 				
-				// Set the new value
+				// Directly set the new value - fastest possible approach
 				element.value = "{escaped_text}";
-				
-				// Trigger comprehensive event sequence for framework compatibility
-				const events = ['input', 'change', 'keydown', 'keyup', 'keypress', 'focus', 'blur'];
-				events.forEach(eventType => {{
-					const event = new Event(eventType, {{ bubbles: true, cancelable: true }});
-					element.dispatchEvent(event);
-				}});
-				
-				// For React and other frameworks, also trigger the input event with InputEvent
-				if (typeof InputEvent !== 'undefined') {{
-					const inputEvent = new InputEvent('input', {{
-						bubbles: true,
-						cancelable: true,
-						inputType: 'insertText',
-						data: "{escaped_text}"
-					}});
-					element.dispatchEvent(inputEvent);
-				}}
-				
-				// Trigger change event specifically for form validation
-				const changeEvent = new Event('change', {{ bubbles: true, cancelable: true }});
-				element.dispatchEvent(changeEvent);
 				
 				return {{ success: true, valueLength: element.value.length }};
 			}})()
 			"""
 
 			if is_sensitive:
-				self.logger.debug('🎯 Fast typing <sensitive> text via JavaScript')
+				self.logger.debug('⚡ Fast pasting <sensitive> text via direct JavaScript')
 			else:
-				self.logger.debug(f'🎯 Fast typing text via JavaScript: "{text}"')
+				self.logger.debug(f'⚡ Fast pasting text via direct JavaScript: "{text}"')
 
 			# Execute the JavaScript
 			js_result = await cdp_session.cdp_client.send.Runtime.callFunctionOn(
@@ -1324,8 +1300,8 @@ class DefaultActionWatchdog(BaseWatchdog):
 			return input_coordinates
 
 		except Exception as e:
-			self.logger.error(f'Failed to fast input text via JavaScript: {type(e).__name__}: {e}')
-			raise BrowserError(f'Failed to fast input text into element: {repr(element_node)}')
+			self.logger.error(f'Failed to fast paste text via JavaScript: {type(e).__name__}: {e}')
+			raise BrowserError(f'Failed to fast paste text into element: {repr(element_node)}')
 
 	async def _trigger_framework_events(self, object_id: str, cdp_session) -> None:
 		"""

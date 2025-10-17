@@ -625,7 +625,7 @@ class BrowserProfile(BrowserConnectArgs, BrowserLaunchPersistentContextArgs, Bro
 	# --- Text input optimization ---
 	fast_typing_mode: bool = Field(
 		default=True,
-		description='Use direct JavaScript input instead of character-by-character CDP events for faster text input. Recommended for cloud browsers to avoid slow CDP roundtrips. When False, text is typed character by character.',
+		description='Use direct JavaScript value assignment (paste approach) instead of character-by-character CDP events for ultra-fast text input. Recommended for cloud browsers to avoid slow CDP roundtrips. When False, text is typed character by character.',
 	)
 
 	# --- UI/viewport/DOM ---
