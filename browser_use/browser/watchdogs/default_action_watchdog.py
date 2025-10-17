@@ -1261,31 +1261,29 @@ class DefaultActionWatchdog(BaseWatchdog):
 			# Escape the text for JavaScript to handle special characters
 			escaped_text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
 
-			# Ultra-fast JavaScript code that just sets the value directly (no events)
-			fast_input_script = f"""
-			(function() {{
-				const element = this;
-				
-				// Clear existing text if requested
-				{'element.value = "";' if clear else ''}
-				
-				// Directly set the new value - fastest possible approach
-				element.value = "{escaped_text}";
-				
-				return {{ success: true, valueLength: element.value.length }};
-			}})()
-			"""
-
 			if is_sensitive:
 				self.logger.debug('⚡ Fast pasting <sensitive> text via direct JavaScript')
 			else:
 				self.logger.debug(f'⚡ Fast pasting text via direct JavaScript: "{text}"')
 
-			# Execute the JavaScript
+			# Execute JavaScript using callFunctionOn with proper function declaration
+			js_function = f"""
+			function() {{
+				// Clear existing text if requested
+				{'this.value = "";' if clear else ''}
+				
+				// Directly set the new value - fastest possible approach
+				this.value = "{escaped_text}";
+				
+				return {{ success: true, valueLength: this.value.length }};
+			}}
+			"""
+
+			# Execute the JavaScript using callFunctionOn
 			js_result = await cdp_session.cdp_client.send.Runtime.callFunctionOn(
 				params={
 					'objectId': object_id,
-					'functionDeclaration': fast_input_script,
+					'functionDeclaration': js_function,
 					'returnByValue': True,
 				},
 				session_id=cdp_session.session_id,
