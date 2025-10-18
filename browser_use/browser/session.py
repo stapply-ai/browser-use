@@ -271,6 +271,9 @@ class BrowserSession(BaseModel):
 		cookie_whitelist_domains: list[str] | None = None,
 		# DOM extraction layer configuration
 		cross_origin_iframes: bool | None = None,
+		# Text input optimization
+		optimize_keyboard_events: bool | None = None,
+		# UI/viewport/DOM
 		highlight_elements: bool | None = None,
 		dom_highlight_elements: bool | None = None,
 		paint_order_filtering: bool | None = None,
