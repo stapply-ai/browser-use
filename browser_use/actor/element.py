@@ -458,46 +458,58 @@ class Element:
 					)
 				else:
 					# Handle regular characters
-					# Get proper modifiers, VK code, and base key for the character
-					modifiers, vk_code, base_key = self._get_char_modifiers_and_vk(char)
-					key_code = self._get_key_code_for_char(base_key)
+					if self._browser_session.browser_profile.optimize_keyboard_events:
+						# Optimized mode: Only send char event for faster remote browser performance
+						await cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'char',
+								'text': char,
+								'key': char,
+							},
+							session_id=session_id,
+						)
+					else:
+						# Standard mode: Send keyDown, char, and keyUp events
+						# Get proper modifiers, VK code, and base key for the character
+						modifiers, vk_code, base_key = self._get_char_modifiers_and_vk(char)
+						key_code = self._get_key_code_for_char(base_key)
 
-					# Step 1: Send keyDown event (NO text parameter)
-					await cdp_client.send.Input.dispatchKeyEvent(
-						params={
-							'type': 'keyDown',
-							'key': base_key,
-							'code': key_code,
-							'modifiers': modifiers,
-							'windowsVirtualKeyCode': vk_code,
-						},
-						session_id=session_id,
-					)
+						# Step 1: Send keyDown event (NO text parameter)
+						await cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'keyDown',
+								'key': base_key,
+								'code': key_code,
+								'modifiers': modifiers,
+								'windowsVirtualKeyCode': vk_code,
+							},
+							session_id=session_id,
+						)
 
-					# Small delay to emulate human typing speed
-					await asyncio.sleep(0.001)
+						# Small delay to emulate human typing speed
+						await asyncio.sleep(0.001)
 
-					# Step 2: Send char event (WITH text parameter) - this is crucial for text input
-					await cdp_client.send.Input.dispatchKeyEvent(
-						params={
-							'type': 'char',
-							'text': char,
-							'key': char,
-						},
-						session_id=session_id,
-					)
+						# Step 2: Send char event (WITH text parameter) - this is crucial for text input
+						await cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'char',
+								'text': char,
+								'key': char,
+							},
+							session_id=session_id,
+						)
 
-					# Step 3: Send keyUp event (NO text parameter)
-					await cdp_client.send.Input.dispatchKeyEvent(
-						params={
-							'type': 'keyUp',
-							'key': base_key,
-							'code': key_code,
-							'modifiers': modifiers,
-							'windowsVirtualKeyCode': vk_code,
-						},
-						session_id=session_id,
-					)
+						# Step 3: Send keyUp event (NO text parameter)
+						await cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'keyUp',
+								'key': base_key,
+								'code': key_code,
+								'modifiers': modifiers,
+								'windowsVirtualKeyCode': vk_code,
+							},
+							session_id=session_id,
+						)
 
 				# Add 18ms delay between keystrokes
 				await asyncio.sleep(0.018)

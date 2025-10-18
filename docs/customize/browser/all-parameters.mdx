@@ -73,6 +73,10 @@ The `Browser` instance also provides all [Actor](/customize/actor/all-parameters
 - `wait_for_network_idle_page_load_time` (default: `0.5`): Time to wait for network activity to cease in seconds
 - `wait_between_actions` (default: `0.5`): Time to wait between agent actions in seconds
 
+## Keyboard Input Optimization
+
+- `optimize_keyboard_events` (default: `False`): Skip keyDown/keyUp events for keyboard input, only send char events. Significantly reduces latency for remote browsers
+
 ## AI Integration
 
 - `highlight_elements` (default: `True`): Highlight interactive elements for AI vision

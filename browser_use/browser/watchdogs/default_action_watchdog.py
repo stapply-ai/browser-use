@@ -103,20 +103,13 @@ class DefaultActionWatchdog(BaseWatchdog):
 			else:
 				try:
 					# Try to type to the specific element
-					if event.fast_typing_mode:
-						input_metadata = await self._fast_input_text_element_node_impl(
-							element_node,
-							event.text,
-							clear=event.clear or (not event.text),
-							is_sensitive=event.is_sensitive,
-						)
-					else:
-						input_metadata = await self._input_text_element_node_impl(
-							element_node,
-							event.text,
-							clear=event.clear or (not event.text),
-							is_sensitive=event.is_sensitive,
-						)
+					
+					input_metadata = await self._input_text_element_node_impl(
+						element_node,
+						event.text,
+						clear=event.clear or (not event.text),
+						is_sensitive=event.is_sensitive,
+					)
 					# Log with sensitive data protection
 					if event.is_sensitive:
 						if event.sensitive_key_name:
@@ -1125,48 +1118,60 @@ class DefaultActionWatchdog(BaseWatchdog):
 					)
 				else:
 					# Handle regular characters
-					# Get proper modifiers, VK code, and base key for the character
-					modifiers, vk_code, base_key = self._get_char_modifiers_and_vk(char)
-					key_code = self._get_key_code_for_char(base_key)
+					if self.browser_session.browser_profile.optimize_keyboard_events:
+						# Optimized mode: Only send char event for faster remote browser performance
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'char',
+								'text': char,
+								'key': char,
+							},
+							session_id=cdp_session.session_id,
+						)
+					else:
+						# Standard mode: Send keyDown, char, and keyUp events
+						# Get proper modifiers, VK code, and base key for the character
+						modifiers, vk_code, base_key = self._get_char_modifiers_and_vk(char)
+						key_code = self._get_key_code_for_char(base_key)
 
-					# self.logger.debug(f'🎯 Typing character {i + 1}/{len(text)}: "{char}" (base_key: {base_key}, code: {key_code}, modifiers: {modifiers}, vk: {vk_code})')
+						# self.logger.debug(f'🎯 Typing character {i + 1}/{len(text)}: "{char}" (base_key: {base_key}, code: {key_code}, modifiers: {modifiers}, vk: {vk_code})')
 
-					# Step 1: Send keyDown event (NO text parameter)
-					await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
-						params={
-							'type': 'keyDown',
-							'key': base_key,
-							'code': key_code,
-							'modifiers': modifiers,
-							'windowsVirtualKeyCode': vk_code,
-						},
-						session_id=cdp_session.session_id,
-					)
+						# Step 1: Send keyDown event (NO text parameter)
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'keyDown',
+								'key': base_key,
+								'code': key_code,
+								'modifiers': modifiers,
+								'windowsVirtualKeyCode': vk_code,
+							},
+							session_id=cdp_session.session_id,
+						)
 
-					# Small delay to emulate human typing speed
-					await asyncio.sleep(0.005)
+						# Small delay to emulate human typing speed
+						await asyncio.sleep(0.005)
 
-					# Step 2: Send char event (WITH text parameter) - this is crucial for text input
-					await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
-						params={
-							'type': 'char',
-							'text': char,
-							'key': char,
-						},
-						session_id=cdp_session.session_id,
-					)
+						# Step 2: Send char event (WITH text parameter) - this is crucial for text input
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'char',
+								'text': char,
+								'key': char,
+							},
+							session_id=cdp_session.session_id,
+						)
 
-					# Step 3: Send keyUp event (NO text parameter)
-					await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
-						params={
-							'type': 'keyUp',
-							'key': base_key,
-							'code': key_code,
-							'modifiers': modifiers,
-							'windowsVirtualKeyCode': vk_code,
-						},
-						session_id=cdp_session.session_id,
-					)
+						# Step 3: Send keyUp event (NO text parameter)
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={
+								'type': 'keyUp',
+								'key': base_key,
+								'code': key_code,
+								'modifiers': modifiers,
+								'windowsVirtualKeyCode': vk_code,
+							},
+							session_id=cdp_session.session_id,
+						)
 
 				# Small delay between characters to look human (realistic typing speed)
 				await asyncio.sleep(0.001)
@@ -1738,22 +1743,50 @@ class DefaultActionWatchdog(BaseWatchdog):
 				for mod in modifiers:
 					modifier_value |= modifier_map.get(mod, 0)
 
-				# Press modifier keys
-				for mod in modifiers:
-					await self._dispatch_key_event(cdp_session, 'keyDown', mod)
+				if self.browser_session.browser_profile.optimize_keyboard_events:
+					# Optimized mode: For key combinations, we still need keyDown/keyUp for modifiers
+					# but we can optimize the main key to use char event when possible
+					if len(main_key) == 1 and main_key.isalnum():
+						# Single character key - use char event for main key
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={'type': 'char', 'text': main_key, 'key': main_key},
+							session_id=cdp_session.session_id,
+						)
+					else:
+						# Special key - use standard keyDown/keyUp
+						await self._dispatch_key_event(cdp_session, 'keyDown', main_key, modifier_value)
+						await self._dispatch_key_event(cdp_session, 'keyUp', main_key, modifier_value)
+				else:
+					# Standard mode: Send keyDown/keyUp events for all keys
+					# Press modifier keys
+					for mod in modifiers:
+						await self._dispatch_key_event(cdp_session, 'keyDown', mod)
 
-				# Press main key with modifiers bitmask
-				await self._dispatch_key_event(cdp_session, 'keyDown', main_key, modifier_value)
+					# Press main key with modifiers bitmask
+					await self._dispatch_key_event(cdp_session, 'keyDown', main_key, modifier_value)
 
-				await self._dispatch_key_event(cdp_session, 'keyUp', main_key, modifier_value)
+					await self._dispatch_key_event(cdp_session, 'keyUp', main_key, modifier_value)
 
-				# Release modifier keys
-				for mod in reversed(modifiers):
-					await self._dispatch_key_event(cdp_session, 'keyUp', mod)
+					# Release modifier keys
+					for mod in reversed(modifiers):
+						await self._dispatch_key_event(cdp_session, 'keyUp', mod)
 			else:
 				# Simple key press
-				await self._dispatch_key_event(cdp_session, 'keyDown', normalized_keys)
-				await self._dispatch_key_event(cdp_session, 'keyUp', normalized_keys)
+				if self.browser_session.browser_profile.optimize_keyboard_events:
+					# Optimized mode: Use char event for single characters, keyDown/keyUp for special keys
+					if len(normalized_keys) == 1 and normalized_keys.isalnum():
+						await cdp_session.cdp_client.send.Input.dispatchKeyEvent(
+							params={'type': 'char', 'text': normalized_keys, 'key': normalized_keys},
+							session_id=cdp_session.session_id,
+						)
+					else:
+						# Special key - use standard keyDown/keyUp
+						await self._dispatch_key_event(cdp_session, 'keyDown', normalized_keys)
+						await self._dispatch_key_event(cdp_session, 'keyUp', normalized_keys)
+				else:
+					# Standard mode: Send keyDown/keyUp events
+					await self._dispatch_key_event(cdp_session, 'keyDown', normalized_keys)
+					await self._dispatch_key_event(cdp_session, 'keyUp', normalized_keys)
 
 			self.logger.info(f'⌨️ Sent keys: {event.keys}')
 
