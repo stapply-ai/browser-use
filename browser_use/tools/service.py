@@ -315,7 +315,6 @@ class Tools(Generic[Context]):
 						clear=params.clear,
 						is_sensitive=has_sensitive_data,
 						sensitive_key_name=sensitive_key_name,
-						fast_typing_mode=browser_session.browser_profile.fast_typing_mode,
 					)
 				)
 				await event

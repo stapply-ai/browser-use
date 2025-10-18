@@ -142,9 +142,6 @@ class TypeTextEvent(ElementSelectedEvent[dict | None]):
 	clear: bool = True
 	is_sensitive: bool = False  # Flag to indicate if text contains sensitive data
 	sensitive_key_name: str | None = None  # Name of the sensitive key being typed (e.g., 'username', 'password')
-	fast_typing_mode: bool = (
-		True  # Use direct JavaScript value assignment (paste approach) instead of character-by-character CDP events
-	)
 
 	event_timeout: float | None = _get_timeout('TIMEOUT_TypeTextEvent', 15.0)  # seconds
 
